@@ -1,0 +1,5 @@
+<nav class="admin-tabs" aria-label="Administration sections">
+    <?php if (has_role('Admin')): ?><a class="<?= ($_SERVER['REQUEST_URI']??'') === '/admin' ? 'active' : '' ?>" href="/admin"><i class="bi bi-speedometer2"></i> Overview</a><?php endif; ?>
+    <a class="<?= str_starts_with($_SERVER['REQUEST_URI']??'', '/admin/articles') ? 'active' : '' ?>" href="/admin/articles"><i class="bi bi-files"></i> Articles</a>
+    <?php if (has_role('Admin')): ?><a class="<?= str_starts_with($_SERVER['REQUEST_URI']??'', '/admin/users') ? 'active' : '' ?>" href="/admin/users"><i class="bi bi-people"></i> Users</a><a class="<?= str_starts_with($_SERVER['REQUEST_URI']??'', '/admin/taxonomies') ? 'active' : '' ?>" href="/admin/taxonomies"><i class="bi bi-diagram-3"></i> Taxonomies</a><a class="<?= str_starts_with($_SERVER['REQUEST_URI']??'', '/admin/import') ? 'active' : '' ?>" href="/admin/import"><i class="bi bi-filetype-csv"></i> CSV Import</a><a class="<?= str_starts_with($_SERVER['REQUEST_URI']??'', '/reports') ? 'active' : '' ?>" href="/reports"><i class="bi bi-bar-chart"></i> Reports</a><?php endif; ?>
+</nav>

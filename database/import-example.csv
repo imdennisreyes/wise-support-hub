@@ -1,0 +1,2 @@
+title,system,category,carrier,error_code,error_message,cause,resolution,keywords,type,severity,status
+Sample rate timeout verification,Shipping Platform,Rate Retrieval,UPS,UPS-RATE-TIMEOUT,Carrier rate request timed out,Carrier gateway or upstream latency,Check gateway health and retry once,UPS rate timeout,Error,High,Draft

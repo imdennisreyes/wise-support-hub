@@ -1,0 +1,22 @@
+# SQLite database (auto-generated at runtime)
+database/support_hub.sqlite
+
+# Database credentials (never commit real credentials)
+config/database.php
+
+# Uploaded files
+uploads/*
+!uploads/.gitkeep
+
+# PHP error logs
+*.log
+error_log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor folders
+.vscode/
+.idea/
+*.swp

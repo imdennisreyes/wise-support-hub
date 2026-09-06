@@ -1,0 +1,1 @@
+<div class="empty-state error-page"><i class="bi bi-exclamation-triangle"></i><h1><?= e($title) ?></h1><p><?= e($message) ?></p><a class="btn btn-primary" href="<?= current_user() ? '/' : '/login' ?>">Return to <?= current_user() ? 'dashboard' : 'sign in' ?></a></div>
