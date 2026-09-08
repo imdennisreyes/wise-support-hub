@@ -4,13 +4,6 @@ Wise Support Hub is a PHP 8+ / MySQL 8 internal knowledge-base application. The 
 
 The application is server-rendered PHP with a small MVC-style structure, Bootstrap 5 and Bootstrap Icons from CDN, and vanilla JavaScript. It has no Node.js or build-time runtime dependency.
 
-> **Development credentials**
->
-> Email: `admin@supporthub.local`  
-> Password: `ChangeMe123!`
->
-> This is a development account. Change the password immediately before sharing or deploying the application. All supplied documentation is clearly marked **Sample / Development Documentation**.
-
 ## Requirements
 
 - PHP 8.0 or newer (PHP 8.2+ recommended)
