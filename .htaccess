@@ -4,5 +4,8 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
+# Application environment
+SetEnv APP_URL https://wisesupporthub.wuaze.com
+
 RewriteRule ^$ public/ [L]
 RewriteRule (.*) public/$1 [L]

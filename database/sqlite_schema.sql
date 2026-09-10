@@ -148,3 +148,12 @@ CREATE TABLE article_versions (
     UNIQUE(article_id, version_number),
     FOREIGN KEY (article_id) REFERENCES knowledge_articles(id), FOREIGN KEY (changed_by) REFERENCES users(id)
 );
+CREATE TABLE api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    last_used_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

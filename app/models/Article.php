@@ -180,6 +180,163 @@ final class Article
         $pdo->prepare('INSERT INTO article_versions (article_id, version_number, snapshot_json, change_summary, changed_by, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)')->execute([$id, $version, $snapshot, trim($summary) ?: 'Article updated', $actorId]);
     }
 
+    // ─── API helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Return a filtered, paginated list of published articles for the REST API.
+     *
+     * Supported $params keys:
+     *   updated_since  ISO-8601 datetime string – only articles updated on or after this time
+     *   search         Full-text search query string
+     *   page           1-based page number (default 1)
+     *   limit          Records per page, capped at 200 (default 100)
+     */
+    public static function apiList(array $params): array
+    {
+        $pdo  = Database::connection();
+        $page  = max(1, (int) ($params['page']  ?? 1));
+        $limit = min(200, max(1, (int) ($params['limit'] ?? 100)));
+        $offset = ($page - 1) * $limit;
+
+        // ── search path ────────────────────────────────────────────────────
+        if (!empty($params['search'])) {
+            $rows = self::search(trim($params['search']));
+            // apply updated_since filter on top of search results
+            if (!empty($params['updated_since'])) {
+                $since = $params['updated_since'];
+                $rows  = array_values(array_filter($rows, fn($r) => $r['updated_at'] >= $since));
+            }
+            $total = count($rows);
+            $rows  = array_slice($rows, $offset, $limit);
+            return ['total' => $total, 'page' => $page, 'limit' => $limit, 'articles' => array_map([self::class, 'formatForApi'], $rows)];
+        }
+
+        // ── browse path ────────────────────────────────────────────────────
+        $where  = ["a.deleted_at IS NULL", "a.status = 'Published'"];
+        $bindParams = [];
+
+        if (!empty($params['updated_since'])) {
+            $where[]     = 'a.updated_at >= ?';
+            $bindParams[] = $params['updated_since'];
+        }
+
+        // count query
+        $countSql  = 'SELECT COUNT(*) FROM knowledge_articles a WHERE ' . implode(' AND ', $where);
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($bindParams);
+        $total = (int) $countStmt->fetchColumn();
+
+        // data query
+        $sql = self::baseSelect()
+            . ' WHERE ' . implode(' AND ', $where)
+            . ' ORDER BY a.updated_at DESC'
+            . ' LIMIT ' . $limit . ' OFFSET ' . $offset;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($bindParams);
+        $rows = $stmt->fetchAll();
+
+        // hydrate tags for each row
+        foreach ($rows as &$row) {
+            $row['tags'] = self::tags((int) $row['id']);
+        }
+        unset($row);
+
+        return [
+            'total'    => $total,
+            'page'     => $page,
+            'limit'    => $limit,
+            'articles' => array_map([self::class, 'formatForApi'], $rows),
+        ];
+    }
+
+    /**
+     * Return a single published article formatted for the REST API.
+     */
+    public static function apiFind(int $id): ?array
+    {
+        $row = self::find($id, publishedOnly: true);
+        return $row ? self::formatForApi($row) : null;
+    }
+
+    /**
+     * Return all published article IDs + updated_at for sitemap generation.
+     */
+    public static function sitemapRows(): array
+    {
+        $sql = "SELECT id, updated_at FROM knowledge_articles
+                WHERE deleted_at IS NULL AND status = 'Published'
+                ORDER BY id";
+        return Database::connection()->query($sql)->fetchAll();
+    }
+
+    /**
+     * Shapes a raw article row into the public API response shape.
+     * Only exposes fields that are safe for external consumption.
+     */
+    private static function formatForApi(array $row): array
+    {
+        // Build the "content" field from whichever rich-text columns are populated
+        $contentParts = array_filter([
+            $row['description']      ?? null,
+            $row['root_cause']       ? "Root Cause:\n" . $row['root_cause']       : null,
+            $row['resolution']       ? "Resolution:\n" . $row['resolution']       : null,
+            $row['sop_steps']        ? "SOP Steps:\n"  . $row['sop_steps']        : null,
+            $row['validation_steps'] ? "Validation:\n" . $row['validation_steps'] : null,
+            $row['escalation_path']  ? "Escalation:\n" . $row['escalation_path']  : null,
+        ]);
+        $content = implode("\n\n", $contentParts);
+
+        // Strip HTML tags so the AI gets plain text, not markup
+        $content = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Normalise updated_at to ISO-8601 / UTC
+        $updatedAt = $row['updated_at'] ?? null;
+        if ($updatedAt && !str_ends_with($updatedAt, 'Z')) {
+            $updatedAt = (new DateTimeImmutable($updatedAt, new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+        }
+
+        // Build tag name list
+        $tagNames = [];
+        if (!empty($row['tags'])) {
+            $tagNames = array_column($row['tags'], 'name');
+        }
+
+        // Determine category: prefer category_name, fall back to type
+        $category = $row['category_name'] ?? $row['system_name'] ?? $row['type'] ?? null;
+
+        return [
+            'id'         => (int) $row['id'],
+            'type'       => $row['type'],
+            'title'      => $row['title'],
+            'content'    => $content,
+            'category'   => $category,
+            'system'     => $row['system_name']   ?? null,
+            'module'     => $row['module_name']   ?? null,
+            'carrier'    => $row['carrier_name']  ?? null,
+            'severity'   => $row['severity']      ?? null,
+            'error_code' => $row['error_code']    ?? null,
+            'tags'       => $tagNames,
+            'url'        => self::publicUrl((int) $row['id']),
+            'updated_at' => $updatedAt,
+            'visibility' => 'public',
+        ];
+    }
+
+    /**
+     * Returns the canonical public URL for an article.
+     * Uses APP_URL env var if set, otherwise constructs from $_SERVER.
+     */
+    private static function publicUrl(int $id): string
+    {
+        $base = rtrim(getenv('APP_URL') ?: '', '/');
+        if (!$base) {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $base   = $scheme . '://' . $host;
+        }
+        return $base . '/articles/' . $id;
+    }
+
     public static function archive(int $id, int $actorId): void
     {
         $pdo = Database::connection();
