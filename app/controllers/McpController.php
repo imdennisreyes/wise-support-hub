@@ -278,16 +278,25 @@ final class McpController
      */
     private static function requireToken(): void
     {
-        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-        if (!str_starts_with($header, 'Bearer ')) {
+        // Apache may deliver the header via $_SERVER or as an env var depending
+        // on the host configuration — check both.
+        $header = $_SERVER['HTTP_AUTHORIZATION']
+               ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+               ?? getenv('HTTP_AUTHORIZATION')
+               ?: '';
+
+        // Strip the "Bearer " prefix if present; accept a bare token too.
+        if (str_starts_with($header, 'Bearer ')) {
+            $rawToken = trim(substr($header, 7));
+        } elseif ($header !== '') {
+            $rawToken = trim($header); // bare token without prefix
+        } else {
             http_response_code(401);
             self::output(self::makeError(null, -32600, 'Missing Authorization header. Expected: Bearer <token>.'));
         }
 
-        $rawToken = substr($header, 7);
-
         // ── 1. Env-var token (no DB required) ────────────────────────────────
-        $envToken = getenv('MCP_API_TOKEN') ?: '';
+        $envToken = trim(getenv('MCP_API_TOKEN') ?: '');
         if ($envToken !== '' && hash_equals($envToken, $rawToken)) {
             return;
         }
