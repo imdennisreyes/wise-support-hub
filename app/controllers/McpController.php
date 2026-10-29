@@ -25,38 +25,46 @@ final class McpController
     public static function handle(): void
     {
         self::boot();
-        self::requireToken();
 
-        $body    = (string) file_get_contents('php://input');
-        $payload = json_decode($body, true);
+        try {
+            self::requireToken();
 
-        if (!is_array($payload)) {
-            self::output(self::makeError(null, -32700, 'Parse error: body is not valid JSON.'));
-        }
+            $body    = (string) file_get_contents('php://input');
+            $payload = json_decode($body, true);
 
-        // Batch request (top-level array of request objects)
-        if (isset($payload[0]) && is_array($payload[0])) {
-            $responses = [];
-            foreach ($payload as $req) {
-                if (is_array($req)) {
-                    $r = self::dispatch($req);
-                    if ($r !== null) $responses[] = $r;
-                }
+            if (!is_array($payload)) {
+                self::output(self::makeError(null, -32700, 'Parse error: body is not valid JSON.'));
             }
-            if ($responses) {
-                self::output($responses);
+
+            // Batch request (top-level array of request objects)
+            if (isset($payload[0]) && is_array($payload[0])) {
+                $responses = [];
+                foreach ($payload as $req) {
+                    if (is_array($req)) {
+                        $r = self::dispatch($req);
+                        if ($r !== null) $responses[] = $r;
+                    }
+                }
+                if ($responses) {
+                    self::output($responses);
+                }
+                http_response_code(204);
+                exit;
+            }
+
+            // Single request
+            $response = self::dispatch($payload);
+            if ($response !== null) {
+                self::output($response);
             }
             http_response_code(204);
             exit;
-        }
 
-        // Single request
-        $response = self::dispatch($payload);
-        if ($response !== null) {
-            self::output($response);
+        } catch (Throwable $e) {
+            error_log('McpController: unhandled error: ' . $e->getMessage());
+            http_response_code(500);
+            self::output(self::makeError(null, -32603, 'Internal server error: ' . $e->getMessage()));
         }
-        http_response_code(204);
-        exit;
     }
 
     // ─── JSON-RPC dispatcher ─────────────────────────────────────────────────
