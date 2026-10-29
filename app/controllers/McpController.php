@@ -269,7 +269,11 @@ final class McpController
 
     /**
      * Validates Authorization: Bearer <token>.
-     * Shares the same api_tokens table as ApiController.
+     *
+     * Checks in this order:
+     *   1. MCP_API_TOKEN env var – simple string compare, no DB needed.
+     *   2. api_tokens table – SHA-256 hash lookup (same as ApiController).
+     *
      * Terminates with HTTP 401 if the token is missing or invalid.
      */
     private static function requireToken(): void
@@ -280,7 +284,15 @@ final class McpController
             self::output(self::makeError(null, -32600, 'Missing Authorization header. Expected: Bearer <token>.'));
         }
 
-        $rawToken  = substr($header, 7);
+        $rawToken = substr($header, 7);
+
+        // ── 1. Env-var token (no DB required) ────────────────────────────────
+        $envToken = getenv('MCP_API_TOKEN') ?: '';
+        if ($envToken !== '' && hash_equals($envToken, $rawToken)) {
+            return;
+        }
+
+        // ── 2. Database token lookup ──────────────────────────────────────────
         $tokenHash = hash('sha256', $rawToken);
         $pdo       = Database::connection();
 
@@ -293,7 +305,6 @@ final class McpController
             self::output(self::makeError(null, -32600, 'Invalid or inactive API token.'));
         }
 
-        // Non-critical: update last_used_at
         try {
             $pdo->prepare("UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?")
                 ->execute([$tokenId]);
