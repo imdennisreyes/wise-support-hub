@@ -41,10 +41,12 @@ WORKDIR /var/www/html
 COPY . .
 
 # ── Permissions ───────────────────────────────────────────────────────────────
-# www-data needs write access to nothing in this app (no file uploads, no cache)
-# but session storage uses the default /tmp which is always writable.
+# www-data needs write access to the database directory for SQLite fallback.
 RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type f -exec chmod 644 {} \; \
-    && find /var/www/html -type d -exec chmod 755 {} \;
+    && find /var/www/html -type d -exec chmod 755 {} \; \
+    && mkdir -p /var/www/html/database \
+    && chown www-data:www-data /var/www/html/database \
+    && chmod 775 /var/www/html/database
 
 EXPOSE 80

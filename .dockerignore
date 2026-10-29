@@ -11,8 +11,18 @@ Dockerfile
 Thumbs.db
 *.log
 
-# Database scripts and local SQLite file (not needed at runtime)
-database/
+# Database – exclude the SQLite file and local-only migration/import scripts
+database/*.sqlite
+database/confluence_*.php
+database/confluence_*.txt
+database/find_images*.php
+database/find_images*.txt
+database/check_images.php
+database/images_*.txt
+database/split_sql.php
+database/import_*.txt
+database/wms_*.sql
+database/wms_sop_import.sql
 database - Copy/
 
 # config/database.php is safe to include — all values come from env vars
