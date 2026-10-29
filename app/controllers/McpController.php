@@ -285,6 +285,13 @@ final class McpController
                ?? getenv('HTTP_AUTHORIZATION')
                ?: '';
 
+        // Temporary debug logging — remove once auth is confirmed working
+        $envToken = trim(getenv('MCP_API_TOKEN') ?: '');
+        error_log('MCP_AUTH_DEBUG header_present=' . ($header !== '' ? 'yes' : 'no')
+            . ' header_len=' . strlen($header)
+            . ' env_token_present=' . ($envToken !== '' ? 'yes' : 'no')
+            . ' env_token_len=' . strlen($envToken));
+
         // Strip the "Bearer " prefix if present; accept a bare token too.
         if (str_starts_with($header, 'Bearer ')) {
             $rawToken = trim(substr($header, 7));
@@ -295,8 +302,10 @@ final class McpController
             self::output(self::makeError(null, -32600, 'Missing Authorization header. Expected: Bearer <token>.'));
         }
 
+        error_log('MCP_AUTH_DEBUG raw_token_len=' . strlen($rawToken)
+            . ' match=' . ($envToken !== '' ? ($envToken === $rawToken ? 'yes' : 'no') : 'no_env'));
+
         // ── 1. Env-var token (no DB required) ────────────────────────────────
-        $envToken = trim(getenv('MCP_API_TOKEN') ?: '');
         if ($envToken !== '' && hash_equals($envToken, $rawToken)) {
             return;
         }
