@@ -5,8 +5,12 @@ require_once dirname(__DIR__) . '/app/bootstrap.php';
 $path = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/') ?: '/';
 
 try {
+    // ── MCP server (Model Context Protocol – token-authenticated) ──────────
+    if ($path === '/mcp') {
+        McpController::handle();
+
     // ── REST API (no session, no CSRF – token-authenticated, read-only) ────
-    if ($path === '/api/articles') {
+    } elseif ($path === '/api/articles') {
         ApiController::articles();
     } elseif (preg_match('#^/api/articles/(\d+)$#', $path, $m)) {
         ApiController::article((int) $m[1]);

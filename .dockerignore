@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# Docker files (no need to copy into image)
+Dockerfile
+.dockerignore
+
+# Local dev / OS clutter
+.DS_Store
+Thumbs.db
+*.log
+
+# Database scripts and local SQLite file (not needed at runtime)
+database/
+database - Copy/
+
+# Local config overrides
+config/database.php
+
+# IDE / editor
+.vscode/
+.kiro/
+*.code-workspace
+
+# Logs that may exist locally
+public/*.log
