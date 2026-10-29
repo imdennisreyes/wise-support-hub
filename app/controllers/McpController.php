@@ -289,48 +289,86 @@ final class McpController
             throw new McpRpcException(-32602, 'The "id" argument must be a positive integer.');
         }
 
-        $article = Article::apiFind($id);
-
-        if (!$article) {
-            // Try fetching regardless of status (handles Draft articles)
-            $row = Article::find($id, publishedOnly: false);
-            if (!$row) {
-                return ['content' => [['type' => 'text', 'text' => "Article ID {$id} was not found."]], 'isError' => true];
-            }
-            // Build response from raw row (Draft/Archived articles)
-            $sep   = str_repeat('─', 60);
-            $lines = ["[{$row['type']}] {$row['title']} [Status: {$row['status']}]", $sep];
-            if (!empty($row['system_name']))  $lines[] = "System:     {$row['system_name']}";
-            if (!empty($row['carrier_name'])) $lines[] = "Carrier:    {$row['carrier_name']}";
-            if (!empty($row['error_code']))   $lines[] = "Error Code: {$row['error_code']}";
-            if (!empty($row['severity']))     $lines[] = "Severity:   {$row['severity']}";
-            $lines[] = "Updated:    {$row['updated_at']}";
-            $lines[] = '';
-            foreach (['description', 'root_cause', 'resolution', 'sop_steps', 'validation_steps', 'escalation_path'] as $f) {
-                if (!empty($row[$f])) $lines[] = strip_tags(html_entity_decode($row[$f], ENT_QUOTES | ENT_HTML5, 'UTF-8')) . "\n";
-            }
-            return self::textResult(implode("\n", $lines));
+        // Fetch raw row first (needed for image extraction and Draft support)
+        $row = Article::find($id, publishedOnly: false);
+        if (!$row) {
+            return ['content' => [['type' => 'text', 'text' => "Article ID {$id} was not found."]], 'isError' => true];
         }
+
+        $article = Article::apiFind($id); // formatted version (may be null if Draft)
 
         $sep   = str_repeat('─', 60);
         $lines = [
-            "[{$article['type']}] {$article['title']}",
+            "[{$row['type']}] {$row['title']}" . ($row['status'] !== 'Published' ? " [Status: {$row['status']}]" : ''),
             $sep,
         ];
 
-        if ($article['system'])     $lines[] = "System:     {$article['system']}";
-        if ($article['module'])     $lines[] = "Module:     {$article['module']}";
-        if ($article['carrier'])    $lines[] = "Carrier:    {$article['carrier']}";
-        if ($article['error_code']) $lines[] = "Error Code: {$article['error_code']}";
-        if ($article['severity'])   $lines[] = "Severity:   {$article['severity']}";
-        if ($article['tags'])       $lines[] = 'Tags:       ' . implode(', ', $article['tags']);
+        if (!empty($row['system_name']))  $lines[] = "System:     {$row['system_name']}";
+        if (!empty($row['module_name']))  $lines[] = "Module:     {$row['module_name']}";
+        if (!empty($row['carrier_name'])) $lines[] = "Carrier:    {$row['carrier_name']}";
+        if (!empty($row['error_code']))   $lines[] = "Error Code: {$row['error_code']}";
+        if (!empty($row['severity']))     $lines[] = "Severity:   {$row['severity']}";
+        if ($article && $article['tags']) $lines[] = 'Tags:       ' . implode(', ', $article['tags']);
 
-        $lines[] = "Updated:    {$article['updated_at']}";
-        $lines[] = "URL:        {$article['url']}";
+        $lines[] = "Updated:    {$row['updated_at']}";
+        $lines[] = "URL:        " . ($article['url'] ?? self::buildArticleUrl($id));
         $lines[] = '';
-        $lines[] = $article['content'];
+
+        // Add text content
+        if ($article) {
+            $lines[] = $article['content'];
+        } else {
+            foreach (['description', 'root_cause', 'resolution', 'sop_steps', 'validation_steps', 'escalation_path'] as $f) {
+                if (!empty($row[$f])) {
+                    $lines[] = strip_tags(html_entity_decode($row[$f], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                    $lines[] = '';
+                }
+            }
+        }
+
+        // Extract and list images from all rich-text fields
+        $imageUrls  = [];
+        $hasEmbedded = false;
+        $base        = rtrim(getenv('APP_URL') ?: '', '/');
+
+        foreach (['description', 'root_cause', 'resolution', 'sop_steps', 'validation_steps', 'escalation_path'] as $f) {
+            if (empty($row[$f])) continue;
+            preg_match_all('/src\s*=\s*"([^"]+)"/i', $row[$f], $matches);
+            foreach ($matches[1] as $src) {
+                if (preg_match('#^data:image/#i', $src)) {
+                    $hasEmbedded = true;                              // base64 — too large to send
+                } elseif (preg_match('#^/uploads/#i', $src)) {
+                    $imageUrls[] = $base . $src;                      // relative → full URL
+                } elseif (preg_match('#^https?://#i', $src)) {
+                    $imageUrls[] = $src;                              // already absolute
+                }
+            }
+        }
+
+        if ($imageUrls || $hasEmbedded) {
+            $lines[] = str_repeat('─', 60);
+            $lines[] = 'IMAGES IN THIS ARTICLE:';
+            foreach (array_unique($imageUrls) as $url) {
+                $lines[] = "  • " . $url;
+            }
+            if ($hasEmbedded) {
+                $lines[] = "  • This article also contains embedded screenshots.";
+                $lines[] = "    View the full article at its URL above to see them.";
+            }
+        }
 
         return self::textResult(implode("\n", $lines));
+    }
+
+    /** Build a canonical article URL from APP_URL or request host. */
+    private static function buildArticleUrl(int $id): string
+    {
+        $base = rtrim(getenv('APP_URL') ?: '', '/');
+        if (!$base) {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $base   = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        }
+        return $base . '/articles/' . $id;
     }
 
     private static function toolCreateArticle(array $args): array
