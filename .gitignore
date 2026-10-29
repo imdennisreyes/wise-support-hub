@@ -1,5 +1,5 @@
-# SQLite database (auto-generated at runtime)
-database/support_hub.sqlite
+# SQLite database is committed as a pre-populated snapshot for Render deployment
+# database/support_hub.sqlite
 
 # config/database.php is safe to commit – credentials are env vars only
 # config/database.php

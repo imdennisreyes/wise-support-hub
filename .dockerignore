@@ -11,8 +11,8 @@ Dockerfile
 Thumbs.db
 *.log
 
-# Database – exclude the SQLite file and local-only migration/import scripts
-database/*.sqlite
+# SQLite database – included as a pre-populated data snapshot for Render deployment
+# database/*.sqlite
 database/confluence_*.php
 database/confluence_*.txt
 database/find_images*.php
