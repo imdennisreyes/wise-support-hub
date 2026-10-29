@@ -15,9 +15,7 @@ Thumbs.db
 database/
 database - Copy/
 
-# Local config overrides
-config/database.php
-
+# config/database.php is safe to include — all values come from env vars
 # IDE / editor
 .vscode/
 .kiro/
