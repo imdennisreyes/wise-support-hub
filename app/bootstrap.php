@@ -19,4 +19,4 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
-Database::connection();
+try { Database::connection(); } catch (Throwable) { /* connection is retried lazily per request */ }
