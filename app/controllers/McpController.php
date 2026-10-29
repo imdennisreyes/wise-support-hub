@@ -292,10 +292,24 @@ final class McpController
         $article = Article::apiFind($id);
 
         if (!$article) {
-            return [
-                'content'  => [['type' => 'text', 'text' => "Article ID {$id} was not found or is not published."]],
-                'isError'  => true,
-            ];
+            // Try fetching regardless of status (handles Draft articles)
+            $row = Article::find($id, publishedOnly: false);
+            if (!$row) {
+                return ['content' => [['type' => 'text', 'text' => "Article ID {$id} was not found."]], 'isError' => true];
+            }
+            // Build response from raw row (Draft/Archived articles)
+            $sep   = str_repeat('─', 60);
+            $lines = ["[{$row['type']}] {$row['title']} [Status: {$row['status']}]", $sep];
+            if (!empty($row['system_name']))  $lines[] = "System:     {$row['system_name']}";
+            if (!empty($row['carrier_name'])) $lines[] = "Carrier:    {$row['carrier_name']}";
+            if (!empty($row['error_code']))   $lines[] = "Error Code: {$row['error_code']}";
+            if (!empty($row['severity']))     $lines[] = "Severity:   {$row['severity']}";
+            $lines[] = "Updated:    {$row['updated_at']}";
+            $lines[] = '';
+            foreach (['description', 'root_cause', 'resolution', 'sop_steps', 'validation_steps', 'escalation_path'] as $f) {
+                if (!empty($row[$f])) $lines[] = strip_tags(html_entity_decode($row[$f], ENT_QUOTES | ENT_HTML5, 'UTF-8')) . "\n";
+            }
+            return self::textResult(implode("\n", $lines));
         }
 
         $sep   = str_repeat('─', 60);
