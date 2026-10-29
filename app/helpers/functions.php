@@ -5,6 +5,32 @@ function e(mixed $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+/**
+ * Render rich content (HTML with embedded base64 images) safely.
+ * Allows only a safe subset of tags and attributes. Strips scripts,
+ * iframes, event handlers, and javascript: URLs.
+ */
+function rich(string $html): string
+{
+    if (trim($html) === '') return '';
+    // Strip dangerous tags entirely
+    $html = preg_replace('#<(script|style|iframe|object|embed|form|input|button)[^>]*>.*?</\1>#is', '', $html);
+    $html = preg_replace('#<(script|style|iframe|object|embed|form|input|button)[^>]*/?>|</?(script|style|iframe|object|embed|form|input|button)>#i', '', $html);
+    // Strip event attributes (onclick, onerror, etc.) and javascript: hrefs
+    $html = preg_replace('/\s+on\w+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]*)/i', '', $html);
+    $html = preg_replace('/href\s*=\s*["\']?\s*javascript:[^"\'>\s]*/i', 'href="#"', $html);
+    // Allow only safe src attributes (data: images, relative /uploads paths, and absolute https paths)
+    $html = preg_replace_callback('/src\s*=\s*"([^"]*)"/i', function($m) {
+        $src = $m[1];
+        if (preg_match('#^data:image/(png|jpeg|gif|webp);base64,#i', $src)) return 'src="' . $src . '"';
+        if (preg_match('#^https?://#i', $src)) return 'src="' . htmlspecialchars($src, ENT_QUOTES) . '"';
+        // Allow relative paths scoped to the uploads directory only
+        if (preg_match('#^/uploads/#i', $src)) return 'src="' . htmlspecialchars($src, ENT_QUOTES) . '"';
+        return 'src=""';
+    }, $html);
+    return $html;
+}
+
 function base_path(string $path = ''): string
 {
     return dirname(__DIR__, 2) . ($path ? '/' . ltrim($path, '/') : '');

@@ -184,3 +184,11 @@ Do not run create/update/archive/import smoke tests against a real operational d
 - **Semantic/AI search:** introduce a search-provider interface, asynchronous embedding/index jobs, per-document access-control metadata, retrieval citations, evaluation sets, and an audited fallback to the current deterministic search. Do not send internal content to an external model without approved data governance.
 - **Microsoft Entra SSO:** add an OpenID Connect authentication adapter, tenant and group-to-role mapping, managed application secrets/certificates, just-in-time user provisioning, conditional-access alignment, and local emergency-access controls.
 - **Wiki import and synchronization:** add staged adapters for CSV, JSON, and sanitized HTML, canonical source identifiers, dry-run diffs, attachment malware scanning, conflict policy, ownership mapping, incremental checkpoints, and a reversible synchronization audit trail.
+
+
+To run the local host
+
+cd "d:\ddreyes\Project\Wise-Support-Hub\wise-support-hub"
+$env:PATH = "C:\xampp\php;$env:PATH"
+$env:USE_SQLITE = "true"
+C:\xampp\php\php.exe -S 0.0.0.0:8000 -t public

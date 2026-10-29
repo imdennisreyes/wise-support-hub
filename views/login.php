@@ -19,10 +19,6 @@
                 <div class="mb-4"><label class="form-label" for="password">Password</label><div class="input-group input-group-lg"><input class="form-control" id="password" name="password" type="password" autocomplete="current-password" required><button class="btn btn-outline-secondary" type="button" data-password-toggle aria-label="Show password" title="Show password"><i class="bi bi-eye"></i></button><div class="invalid-feedback">Enter your password.</div></div></div>
                 <button class="btn btn-primary btn-lg w-100" type="submit" data-loading-text="Signing in..."><span>Sign in</span></button>
             </form>
-            <div class="dev-credentials mt-4">
-                <div class="d-flex gap-2"><i class="bi bi-info-circle"></i><div><strong>Development access</strong><small>Sample / Development Documentation</small></div></div>
-                <dl><dt>Email</dt><dd>admin@supporthub.local</dd><dt>Password</dt><dd>ChangeMe123!</dd></dl>
-            </div>
         </div>
     </section>
 </main>

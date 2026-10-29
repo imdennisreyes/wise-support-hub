@@ -17,6 +17,8 @@ final class AdminController
         if ($path === '/admin/taxonomies') { self::taxonomies(); return; }
         if (preg_match('#^/admin/taxonomies/([a-z]+)/archive$#', $path, $m) && method_is('POST')) { self::archiveTaxonomy($m[1]); return; }
         if ($path === '/admin/import') { self::import(); return; }
+        if ($path === '/admin/confluence-sync') { self::confluenceSync(); return; }
+        if ($path === '/admin/confluence-sync/run' && method_is('POST')) { self::confluenceSyncRun(); return; }
         http_response_code(404);
         render('error', ['title' => 'Admin page not found', 'message' => 'The requested administration page does not exist.']);
     }
@@ -233,5 +235,41 @@ final class AdminController
         $feedback=$pdo->query('SELECT a.id,a.title,COUNT(f.id) AS responses,SUM(CASE WHEN f.is_helpful=1 THEN 1 ELSE 0 END) AS helpful,SUM(CASE WHEN f.is_helpful=0 THEN 1 ELSE 0 END) AS unhelpful FROM knowledge_articles a JOIN article_feedback f ON f.article_id=a.id GROUP BY a.id,a.title ORDER BY unhelpful DESC,responses DESC')->fetchAll();
         $comments=$pdo->query('SELECT f.reason,f.created_at,a.id AS article_id,a.title,u.name AS user_name FROM article_feedback f JOIN knowledge_articles a ON a.id=f.article_id LEFT JOIN users u ON u.id=f.user_id WHERE f.is_helpful=0 AND f.reason IS NOT NULL ORDER BY f.created_at DESC LIMIT 50')->fetchAll();
         render('admin/reports',['title'=>'Reports','searches'=>$searches,'feedback'=>$feedback,'comments'=>$comments]);
+    }
+
+    // ── Confluence Sync ───────────────────────────────────────────────────────
+
+    private static function confluenceSync(): void
+    {
+        require_role('Admin');
+        render('admin/confluence_sync', ['title' => 'Confluence Sync']);
+    }
+
+    private static function confluenceSyncRun(): void
+    {
+        require_role('Admin');
+        verify_csrf();
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        $translate = !empty($_POST['translate']);
+        $actorId   = current_user()['id'] ?? 1;
+
+        try {
+            $service = new ConfluenceSyncService();
+            $result  = $service->sync($translate, (int) $actorId);
+            echo json_encode($result);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'imported' => 0,
+                'updated'  => 0,
+                'skipped'  => 0,
+                'errors'   => [$e->getMessage()],
+                'log'      => [['status' => 'error', 'message' => $e->getMessage()]],
+            ]);
+        }
+
+        exit;
     }
 }

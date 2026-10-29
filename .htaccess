@@ -1,11 +1,15 @@
 RewriteEngine On
 
-# Force HTTPS
+# ── www → non-www redirect ────────────────────────────────────────────────────
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+# ── Force HTTPS ───────────────────────────────────────────────────────────────
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
-# Application environment
-SetEnv APP_URL https://wisesupporthub.wuaze.com
-
+# ── Route all requests into public/ (shared hosting fallback) ─────────────────
+# Not used when running via Docker — apache.conf sets DocumentRoot to public/
+# directly. Kept here for InfinityFree / shared hosting compatibility.
 RewriteRule ^$ public/ [L]
 RewriteRule (.*) public/$1 [L]

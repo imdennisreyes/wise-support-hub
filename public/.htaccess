@@ -1,4 +1,13 @@
 RewriteEngine On
+
+# ── Bypass InfinityFree AES bot challenge for API and sitemap requests ────────
+# These paths are consumed by server-side clients that cannot run JavaScript.
+# They are still protected by Bearer token authentication in the application.
+RewriteCond %{REQUEST_URI} ^/api/ [OR]
+RewriteCond %{REQUEST_URI} ^/sitemap\.xml
+RewriteRule ^ - [E=noabort:1,E=nodefensebot:1,L]
+
+# ── Front-controller ──────────────────────────────────────────────────────────
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
