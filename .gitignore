@@ -1,8 +1,8 @@
 # SQLite database (auto-generated at runtime)
 database/support_hub.sqlite
 
-# Database credentials (never commit real credentials)
-config/database.php
+# config/database.php is safe to commit – credentials are env vars only
+# config/database.php
 
 # Uploaded files
 uploads/*
