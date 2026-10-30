@@ -17,6 +17,7 @@ final class AdminController
         if ($path === '/admin/taxonomies') { self::taxonomies(); return; }
         if (preg_match('#^/admin/taxonomies/([a-z]+)/archive$#', $path, $m) && method_is('POST')) { self::archiveTaxonomy($m[1]); return; }
         if ($path === '/admin/import') { self::import(); return; }
+        if ($path === '/admin/doc-import') { self::docImport(); return; }
         if ($path === '/admin/confluence-sync') { self::confluenceSync(); return; }
         if ($path === '/admin/confluence-sync/run' && method_is('POST')) { self::confluenceSyncRun(); return; }
         http_response_code(404);
@@ -235,6 +236,67 @@ final class AdminController
         $feedback=$pdo->query('SELECT a.id,a.title,COUNT(f.id) AS responses,SUM(CASE WHEN f.is_helpful=1 THEN 1 ELSE 0 END) AS helpful,SUM(CASE WHEN f.is_helpful=0 THEN 1 ELSE 0 END) AS unhelpful FROM knowledge_articles a JOIN article_feedback f ON f.article_id=a.id GROUP BY a.id,a.title ORDER BY unhelpful DESC,responses DESC')->fetchAll();
         $comments=$pdo->query('SELECT f.reason,f.created_at,a.id AS article_id,a.title,u.name AS user_name FROM article_feedback f JOIN knowledge_articles a ON a.id=f.article_id LEFT JOIN users u ON u.id=f.user_id WHERE f.is_helpful=0 AND f.reason IS NOT NULL ORDER BY f.created_at DESC LIMIT 50')->fetchAll();
         render('admin/reports',['title'=>'Reports','searches'=>$searches,'feedback'=>$feedback,'comments'=>$comments]);
+    }
+
+    // ── Document Import ───────────────────────────────────────────────────────
+
+    private static function docImport(): void
+    {
+        require_role('Admin');
+        $errors = [];
+
+        if (method_is('POST')) {
+            verify_csrf();
+
+            $fileError = $_FILES['document']['error'] ?? UPLOAD_ERR_NO_FILE;
+
+            if ($fileError !== UPLOAD_ERR_OK) {
+                $errors[] = $fileError === UPLOAD_ERR_NO_FILE
+                    ? 'Choose a Word (.docx) or PDF file to import.'
+                    : 'File upload failed (error code ' . $fileError . '). Try again.';
+            } elseif ($_FILES['document']['size'] > 16 * 1024 * 1024) {
+                $errors[] = 'File may not exceed 16 MB.';
+            } else {
+                $file     = $_FILES['document'];
+                $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $mime     = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+                $okMimes  = [
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/pdf',
+                    'application/octet-stream',   // some browsers send this for .docx
+                    'application/zip',            // also seen for .docx
+                ];
+                $okExts = ['docx', 'pdf'];
+
+                if (!in_array($ext, $okExts, true) || (!in_array($mime, $okMimes, true) && !in_array($ext, $okExts, true))) {
+                    $errors[] = 'Only Word (.docx) and PDF files are supported.';
+                } else {
+                    $type = in_array($_POST['type'] ?? '', ['Article', 'Error', 'SOP', 'Request'], true)
+                        ? $_POST['type']
+                        : 'Article';
+
+                    try {
+                        $parsed    = DocumentParserService::parse($file['tmp_name'], $file['name']);
+                        $articleId = Article::save([
+                            'type'           => $type,
+                            'title'          => $parsed['title'],
+                            'description'    => $parsed['description'],
+                            'status'         => 'Draft',
+                            'owner_id'       => current_user()['id'],
+                            'is_sample'      => 0,
+                            'change_summary' => 'Imported from document: ' . $parsed['filename'],
+                        ], null, current_user()['id']);
+
+                        flash('success', 'Document imported as a Draft article. Review the content and publish when ready.');
+                        redirect('/admin/articles/' . $articleId . '/edit');
+                    } catch (RuntimeException $e) {
+                        $errors[] = $e->getMessage();
+                    }
+                }
+            }
+        }
+
+        render('admin/doc_import', ['title' => 'Document Import', 'errors' => $errors]);
     }
 
     // ── Confluence Sync ───────────────────────────────────────────────────────

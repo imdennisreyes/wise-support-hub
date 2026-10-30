@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zip \
         unzip \
         curl \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # ── PHP extensions ────────────────────────────────────────────────────────────
@@ -45,8 +46,8 @@ COPY . .
 RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type f -exec chmod 644 {} \; \
     && find /var/www/html -type d -exec chmod 755 {} \; \
-    && mkdir -p /var/www/html/database \
-    && chown www-data:www-data /var/www/html/database \
-    && chmod 775 /var/www/html/database
+    && mkdir -p /var/www/html/database /var/www/html/uploads \
+    && chown www-data:www-data /var/www/html/database /var/www/html/uploads \
+    && chmod 775 /var/www/html/database /var/www/html/uploads
 
 EXPOSE 80
