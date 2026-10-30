@@ -14,7 +14,7 @@ final class Database
         $forceSqlite = filter_var(getenv('USE_SQLITE') ?: 'false', FILTER_VALIDATE_BOOLEAN);
         if (!$forceSqlite) {
             try {
-                $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s;connect_timeout=5', $config['host'], $config['port'], $config['database'], $config['charset']);
+                $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s;connect_timeout=15', $config['host'], $config['port'], $config['database'], $config['charset']);
                 self::$pdo = new PDO($dsn, $config['username'], $config['password'], self::options());
                 return self::$pdo;
             } catch (PDOException $exception) {
