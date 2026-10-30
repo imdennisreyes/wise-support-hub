@@ -290,10 +290,15 @@ final class AdminController
                         // Store the original file binary in the DB so it can be downloaded later
                         $fileData = file_get_contents($file['tmp_name']);
                         if ($fileData !== false) {
-                            $stmt = Database::connection()->prepare(
-                                'UPDATE knowledge_articles SET source_document_name = ?, source_document_data = ? WHERE id = ?'
-                            );
-                            $stmt->execute([$file['name'], $fileData, $articleId]);
+                            try {
+                                $stmt = Database::connection()->prepare(
+                                    'UPDATE knowledge_articles SET source_document_name = ?, source_document_data = ? WHERE id = ?'
+                                );
+                                $stmt->execute([$file['name'], $fileData, $articleId]);
+                            } catch (Throwable) {
+                                // Non-fatal — article is still created; user can re-attach file later
+                                flash('warning', 'Article created but the original file could not be stored. The text content was imported successfully.');
+                            }
                         }
 
                         flash('success', 'Document imported as a Draft article. Review the content and publish when ready.');
