@@ -68,7 +68,6 @@ final class AdminController
             if (!in_array($data['status'] ?? '', $allowed['status'], true)) $errors[] = 'Select a valid status.';
             if (trim($data['title'] ?? '') === '') $errors[] = 'Title is required.';
             if (trim($data['description'] ?? '') === '') $errors[] = 'Description is required.';
-            if (($data['type'] ?? '') === 'SOP' && trim($data['sop_steps'] ?? '') === '') $errors[] = 'SOP steps are required for SOP records.';
             if (!$errors) {
                 $savedId = Article::save($data, $id, current_user()['id']);
                 flash('success', $id ? 'Article updated and version recorded.' : 'Article created and version recorded.');
