@@ -55,4 +55,37 @@ final class ArticleController
         flash('success', 'Thank you. Your feedback has been recorded.');
         redirect('/articles/' . $id . '#feedback');
     }
+
+    public static function download(int $id): void
+    {
+        require_auth();
+
+        $stmt = Database::connection()->prepare(
+            'SELECT source_document_name, source_document_data FROM knowledge_articles WHERE id = ? AND deleted_at IS NULL'
+        );
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        if (!$row || empty($row['source_document_data'])) {
+            http_response_code(404);
+            render('error', ['title' => 'No source file', 'message' => 'No original document is attached to this article.']);
+            return;
+        }
+
+        $filename = $row['source_document_name'] ?: 'document';
+        $ext      = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $mime     = match ($ext) {
+            'pdf'  => 'application/pdf',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            default => 'application/octet-stream',
+        };
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: attachment; filename="' . rawurlencode($filename) . '"');
+        header('Content-Length: ' . strlen($row['source_document_data']));
+        header('Cache-Control: no-store, no-cache');
+        header('X-Content-Type-Options: nosniff');
+        echo $row['source_document_data'];
+        exit;
+    }
 }

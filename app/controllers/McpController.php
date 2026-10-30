@@ -312,6 +312,18 @@ final class McpController
 
         $lines[] = "Updated:    {$row['updated_at']}";
         $lines[] = "URL:        " . ($article['url'] ?? self::buildArticleUrl($id));
+
+        // Include original document download link if one was attached on import
+        $docStmt = Database::connection()->prepare(
+            'SELECT source_document_name FROM knowledge_articles WHERE id = ? AND source_document_name IS NOT NULL'
+        );
+        $docStmt->execute([$id]);
+        $docName = $docStmt->fetchColumn();
+        if ($docName) {
+            $base = rtrim(getenv('APP_URL') ?: '', '/') ?: ('https://' . ($_SERVER['HTTP_HOST'] ?? 'wise-support-hub.onrender.com'));
+            $lines[] = "Download:   {$base}/articles/{$id}/download  ({$docName})";
+        }
+
         $lines[] = '';
 
         // Add text content

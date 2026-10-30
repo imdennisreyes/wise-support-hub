@@ -287,6 +287,15 @@ final class AdminController
                             'change_summary' => 'Imported from document: ' . $parsed['filename'],
                         ], null, current_user()['id']);
 
+                        // Store the original file binary in the DB so it can be downloaded later
+                        $fileData = file_get_contents($file['tmp_name']);
+                        if ($fileData !== false) {
+                            $stmt = Database::connection()->prepare(
+                                'UPDATE knowledge_articles SET source_document_name = ?, source_document_data = ? WHERE id = ?'
+                            );
+                            $stmt->execute([$file['name'], $fileData, $articleId]);
+                        }
+
                         flash('success', 'Document imported as a Draft article. Review the content and publish when ready.');
                         redirect('/admin/articles/' . $articleId . '/edit');
                     } catch (RuntimeException $e) {

@@ -54,6 +54,8 @@ try {
         ArticleController::show((int) $m[1]);
     } elseif (preg_match('#^/articles/(\d+)/feedback$#', $path, $m) && method_is('POST')) {
         ArticleController::feedback((int) $m[1]);
+    } elseif (preg_match('#^/articles/(\d+)/download$#', $path, $m)) {
+        ArticleController::download((int) $m[1]);
     } elseif (str_starts_with($path, '/admin') || $path === '/reports') {
         AdminController::route($path);
     } else {
