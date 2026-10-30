@@ -357,6 +357,27 @@ final class McpController
             }
         }
 
+        // Extract base64 images from all rich-text fields and include as MCP image content
+        // so multimodal AI models (GPT-4V, Gemini, Claude Vision) can see them.
+        $imageContent = [];
+        $hasEmbedded  = false;
+
+        foreach (['description', 'root_cause', 'resolution', 'sop_steps', 'validation_steps', 'escalation_path'] as $f) {
+            if (empty($row[$f])) continue;
+            preg_match_all('#src="data:(image/[^;]+);base64,([A-Za-z0-9+/=]+)"#', $row[$f], $imgMatches);
+            foreach ($imgMatches[1] as $idx => $mime) {
+                $hasEmbedded = true;
+                // Limit to first 5 images and skip if base64 is >1MB to avoid overwhelming context
+                if (count($imageContent) < 5 && strlen($imgMatches[2][$idx]) < 1_400_000) {
+                    $imageContent[] = [
+                        'type'     => 'image',
+                        'data'     => $imgMatches[2][$idx],
+                        'mimeType' => $mime,
+                    ];
+                }
+            }
+        }
+
         if ($imageUrls || $hasEmbedded) {
             $lines[] = str_repeat('─', 60);
             $lines[] = 'IMAGES IN THIS ARTICLE:';
@@ -364,12 +385,19 @@ final class McpController
                 $lines[] = "  • " . $url;
             }
             if ($hasEmbedded) {
-                $lines[] = "  • This article also contains embedded screenshots.";
-                $lines[] = "    View the full article at its URL above to see them.";
+                $remaining = max(0, (int) preg_match_all('#src="data:image/#', implode('', array_filter([$row['description'] ?? '', $row['sop_steps'] ?? '']))) - count($imageContent));
+                if ($remaining > 0) {
+                    $lines[] = "  • {$remaining} additional image(s) omitted (too large for AI context — view at article URL above)";
+                }
             }
         }
 
-        return self::textResult(implode("\n", $lines));
+        $content = [['type' => 'text', 'text' => implode("\n", $lines)]];
+        foreach ($imageContent as $imgItem) {
+            $content[] = $imgItem;
+        }
+
+        return ['content' => $content];
     }
 
     /** Build a canonical article URL from APP_URL or request host. */

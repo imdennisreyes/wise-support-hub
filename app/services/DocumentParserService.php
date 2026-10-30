@@ -50,18 +50,24 @@ final class DocumentParserService
         }
 
         $xml = $zip->getFromName('word/document.xml');
-        $zip->close();
 
         if ($xml === false) {
+            $zip->close();
             throw new RuntimeException(
                 'word/document.xml was not found inside the .docx file. The file may be invalid.'
             );
         }
 
-        return self::buildFromParagraphs(
+        // Extract embedded images from word/media/
+        $images = self::extractDocxImages($zip);
+        $zip->close();
+
+        $result = self::buildFromParagraphs(
             self::extractDocxParagraphs($xml),
             $originalName
         );
+        $result['images'] = $images;
+        return $result;
     }
 
     /**
@@ -92,6 +98,33 @@ final class DocumentParserService
         }
 
         return $paragraphs;
+    }
+
+    /**
+     * Extract embedded images from word/media/ inside the DOCX ZIP.
+     * Returns an array of ['name', 'mime', 'base64'] for each image.
+     * Skips images larger than 800 KB to avoid bloating the DB.
+     */
+    private static function extractDocxImages(ZipArchive $zip): array
+    {
+        $images = [];
+        $mimeMap = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp', 'png' => 'image/png'];
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entry = $zip->getNameIndex($i);
+            if (!preg_match('#^word/media/(.+\.(png|jpe?g|gif|webp))$#i', $entry, $m)) continue;
+
+            $data = $zip->getFromIndex($i);
+            if ($data === false || strlen($data) > 800 * 1024) continue;  // skip >800 KB
+
+            $ext  = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
+            $images[] = [
+                'name'   => basename($entry),
+                'mime'   => $mimeMap[$ext] ?? 'image/png',
+                'base64' => base64_encode($data),
+            ];
+        }
+        return $images;
     }
 
     // ─── PDF parser ───────────────────────────────────────────────────────────

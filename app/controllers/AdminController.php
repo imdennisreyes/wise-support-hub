@@ -295,8 +295,23 @@ final class AdminController
                                 );
                                 $stmt->execute([$file['name'], $fileData, $articleId]);
                             } catch (Throwable) {
-                                // Non-fatal — article is still created; user can re-attach file later
                                 flash('warning', 'Article created but the original file could not be stored. The text content was imported successfully.');
+                            }
+                        }
+
+                        // Embed extracted images as base64 data URIs into the article description
+                        if (!empty($parsed['images'])) {
+                            try {
+                                $existing = Article::find($articleId);
+                                $imageHtml = '';
+                                foreach ($parsed['images'] as $img) {
+                                    $imageHtml .= '<img src="data:' . $img['mime'] . ';base64,' . $img['base64'] . '" alt="' . htmlspecialchars($img['name'], ENT_QUOTES) . '" style="max-width:100%;margin:8px 0;">';
+                                }
+                                $updatedDesc = ($existing['description'] ?? '') . $imageHtml;
+                                Database::connection()->prepare('UPDATE knowledge_articles SET description = ? WHERE id = ?')
+                                    ->execute([$updatedDesc, $articleId]);
+                            } catch (Throwable) {
+                                // Non-fatal – images skipped, text still imported
                             }
                         }
 
